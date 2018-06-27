@@ -1,0 +1,1036 @@
+FORMAT: 1A
+HOST: https://api.skypicker.com
+
+# Kiwi.com API
+This document describes the Skypicker.com flights search API.
+
+The default API endpoint is api.skypicker.com. When loading the API https must be used - always.
+Currently, the SSLv3 is disabled. If you receive a 'handshake failed' error response, use TLS 1, 1.1 or 1.2 in your client config.  
+
+To implement the basic search, you only need the /places and /flights API calls.
+
+In order to implement the booking API, you need to use the booking_token hash containing all the required flights data and pass it as parameters to check flights as well as to save booking calls.
+
+The /places call contains the list of Skypicker API IDs, which are accepted by the /flights call in the 'flyFrom' and 'to' parameters. Basically, the IDs are the IATA airport and ISO country codes.  
+However, Skypicker also uses its own IDs as the engine can do very specific searches (currently _anywhere_ and there could be other geo areas specified - "To the sea", "To party places" etc.)
+
+We also have a **Service Status** page.  You can view it here: http://status.kiwi.com/
+
+# Partner implementation notes
+
+Use the parameter partner=picky for testing your implementation. Before going live, your account manager will assign your custom partner ID to you.
+
+There is no development API, as most of the queries are simple GET requests that are not changing the state of any resource (except save_booking).
+Feel free to use api.skypicker.com for the implementation and also testing.
+
+Currently, all  our flights are economy class and each passenger is considered an adult.  
+
+# How it works
+The rules are the same for every search except for deeplink! For more information about deeplinks, please see below.  
+
+1. Always **start with** https://api.skypicker.com/
+
+2. Choose **one specific call** from the list below (places, flights, flights_multi, check_flights, save_booking, paymill_payment, zooz_payment, watchdog), 
+e.g. https://api.skypicker.com/locations/
+
+3. For **specific searches** and filters use " **?** " after the chosen call, e.g. /places?
+4. Then **choose and specify parameters** from specific call list, where every available parameter is described. 
+Choose one of them and use it in its exact form (case sensitive) with " **=** ". Then **set a value** of the parameter, e.g. https://api.skypicker.com/locations?term=br
+"Term" is used for geo names and "br" returns city, airport codes or country names beginning with "br".
+
+5. You may want to **combine more parameters**.  You must place an ampersand " **&** " between the paramenters to separate them, e.g. https://api.skypicker.com/locations?term=br&locale=cs
+This call will return all geo names beginning with br in Czech language.
+
+6. Some of the parameters are **mandatory** for use in specific calls. Check it in the **Details** column of every parameter, 
+e.g. in **flights search** parameters flyFrom, to, dateFrom and dateTo are mandatory: https://api.skypicker.com/flights?flyFrom=PRG&to=LGW&dateFrom=18/06/2017&dateTo=25/06/2017&partner=picky.
+The call will return all flights from Prague to London Gatwick, from May 18, 2017 to  May 25, 2017.  
+
+The correct date format is **dd/mm/YYYY**, e.g. 29/05/2015. 
+
+# Deeplink
+Deeplinking is a methodology for launching a native mobile application via a link. Deeplinking connects
+a unique url to a defined action in a mobile app or a web page, seamlessly linking users to relevant content. When a partner ID is used, our search results
+include a deeplink.  This deeplink - when clicked - takes the user to www.kiwi.com booking page.  It will contain all of the required data as per the search results.  
+
+
+#### Search
+The basic flights call could look like this: 
+
+https://api.skypicker.com/flights?flyFrom=PRG&to=LGW&dateFrom=18/06/2017&dateTo=25/06/2017&partner=picky
+
+If the partner parameter is specified, the response will contain the link directly to Skypicker booking, where user can book the specified flight. 
+
+For more specific searches and filters continue to this apiary specification, where every available parameter is described. 
+
+In case you can't find what you're looking for in this document please contact us directly at **api@kiwi.com**.
+
+## Group places
+
+ <strike>/places returns a list of Skypicker API IDs. These IDs have to be used un the SP search (flights API call).  
+From v2 (May 2014) flights also accepts parameters for city areas (LON, PAR...), even if they don't appear in the places call.</strike>
+
+The /places is __DEPRECATED__ please use the following documentation for __/locations__ instead: 
+
+http://docs.locations10.apiary.io/#
+
+## places [/places{?id,term,locale,zoomLevelThreshold,lat_lo,lng_lo,lat_hi,lng_hi,bounds,v}]
+
+### GET [GET]
+
+
++ Parameters
+    + id : SK (optional, string) - if given, the call returns the details only for the one specific id
+    + term : br (optional, string) - used for suggestions of geo names, "br" returns city, airport codes or country names beginning with br
+    + locale : cs (optional, string) - the locale of geo names in response, default is en
+    + zoomLevelThreshold : `3` (optional, integer) - zoom level on which this place should be shown. DEPRECATED
+    + lat_lo (optional, float, `45.090329`) ... latitude of southwest corner of geo box search, 45.09 is also acceptable
+    + lng_lo (optional, float, `1.596681`) ... longitude of southwest corner of geo box search, 1.59 is also acceptable
+    + lat_hi (optional, float, `53.905417`) ... latitude of northeast corner of geo box search, 53.90 is also acceptable
+    + lng_hi (optional, float, `23.217775`) ... longitude of northeast corner of geo box search, 23.21 is also acceptable
+    + v : 1 (optional, integer)  - the api version, from v = 2 it returns the new api ids for the whole world. Every new partner should use v = 3
+
++ Request
+    
+        { "term":"BRQ" }
+
++ Response 200
+
+        {
+            "zoomLevelThreshold": 7,
+            "numberOfAirports": 1,
+            "sp_score": null,
+            "value": "Brno",
+            "rank": 8,
+            "parentId": 1,
+            "lat": 49.1952,
+            "lng": 16.608,
+            "type": 0,
+            "id": "BRQ"
+        }
+
+## Group Locations
+'Locations' is a simple API used to search, suggest and resolve locations in various situations.
+
+## Locations Collection [/]
+
+### Locale setting
+Every search in this collection accepts `locale` 
+GET argument which sets output locale to your specified locale.
+This is optional and defaults to locale 'en'.
+
+Available locales:
+
+|       |       |       |       |       |       |
+|------ |------ |------ |------ |------ |------ |
+| ar-AE | cs-CZ | da-DK | de-DE | el-GR | en-US |
+| es-ES | fi-FI | fr-FR | hu-HU | is-IS | it-IT |
+| iw-IL | ja-JP | ko-KR | lt-LT | nl-NL | no-NO |
+| pl-PL | pt-BR | pt-PT | ro-RO | ru-RU | sk-SK |
+| sr-RS | sv-SE | th-TH | tr-TR | uk-UA | zh-CN |
+| zh-TW |
+
+
+### Output location types
+Every search in this collection accepts `location_types` list, which is optional and decides 
+what types of locations will be on the output. If not specified the output will contain all types, such as 
+`airport`, `city` and `country`. You are able to specify one or more location types by 
+appending more `&location_types=` to your query string.
+
+### Limiting the output
+Every search request has a `limit` parameter to set maximum number of results. The default is 20.
+
+### Sorting the output
+Dump requests as well as search requests by radius and box can have the output sorted according 
+to specified `sort` parameters. The default sorting order is set to 'ascending'.  Descending 
+order can be set by adding a minus sign in front of the parameter, eg. `-rank`. Sorting by `name` is 
+localized according to specified locale. Multiple sorting parameters can be set.  The order of their 
+appearance in url determines priority in sorting. Keep in mind that to use `type` to sort, you need to
+use `_type`.
+
+### Search by query [GET /locations?term={term}&locale={locale}&location_types={location_types}&limit={limit}&sort={sort}]
++ Parameters
+    + term (required, string, `PRG`) ... searched term (for suggestions).  This parameter expects a full IATA code.  
+    If IATA code is not given, the search will go through other available fields: 'id', 'name' or 'code' of the 
+        location. 
+        It also depends on the 'location_types' specified eg. airport, city, country.  The search that is used 
+        behind the scenes is elasticsearch.  It returns data based on relevancy and many other factors.  
+    + locale (optional, string, `en-US`) ... desired locale output - this is the language of the results.  
+        Should any other locale be used other than the specified locales, en-US is used.  
+    + location_types (optional, list, `airport`) ... desired location output, accepted values: 
+    `station`, `airport`, `city`, `autonomous_territory`, `subdivision`, `country`.  To use more than one `location_types`, use `&location_types=`
+    + limit (optional, integer, `100`) ... desired number of results in the output
+    + sort (string, optional) - desired order of the output.  For A->Z use 'sort=name', for Z->A use 'sort=-name'.  The sorting method called 'rank' expresses the significance of the location, 'sort=rank'.  
+    
++ Response 200 (application/json)
+    + Attributes
+        + locations (array[City, Subdivision, Country, Airport])
+
+### Search by radius [GET /locations?type=radius&lat={lat}&lon={lon}&radius={radius}&locale={locale}&location_types={location_types}&limit={limit}&sort={sort}]
++ Parameters
+    + lat (required, float, `40.730610`) ... latitude of the centre point of the search.  `40.7` is also acceptable.  
+    + lon (required, float, `-73.935242`) ... longitude of the centre point of the search.  `-73.9` is also acceptable.  
+    + radius (required, float, `250`) ... the radious defaults to 250 km but can be changed
+    + locale (optional, string, `en-US`) ... desired locale output - this is the the language of the results.  
+        Should any other locale be used other than the specified locales, en-US is used.  
+    
+    + location_types (optional, list, `airport`) ... desired location types of the search.  Accepted values: 
+    `station`, `airport`, `city`, `autonomous_territory`, `subdivision`, `country`.  To use more than one `location_types`, use `&location_types=`
+    + limit (int, optional) - desired number of results in the output
+    + sort (string, optional) - desired order of the output.  For A->Z use 'sort=name', for Z->A use 'sort=-name'.  The sorting method called 'rank' expresses the significance of the location, 'sort=rank'.  
++ Response 200 (application/json)
+    + Attributes
+        + locations (array[City, Subdivision, Country, Airport])
+
+### Search by box [GET /locations?type=box&low_lat={low_lat}&low_lon={low_lon}&high_lat={high_lat}&high_lon={high_lon}&locale={locale}&location_types={location_types}&limit={limit}&sort={sort}]
++ Parameters
+    + low_lat (required, float, `40.200610`) ...  latitude of southwest corner of geo box search; `40.2` is also acceptable.
+    + low_lon (required, float, `-74.624328`) ... longitude of southwest corner of geo box search; `-74.6` is also acceptable.  
+    + high_lat (required, float, `44.763212`) ... latitude of northeast corner of geo box search; `44.7` is also acceptable.
+    + high_lon (required, float, `-73.376543`) ... longitude of northeast corner of geo box search; `-73.3` is also acceptable.  
+    + locale (optional, string, `en-US`) ... desired locale output - this is the the language of the results.  
+        Should any other locale be used other than the specified locales, en-US is used.  
+    + location_types (optional, list, `airport`) ... desired location types of the search.  Accepted values: 
+   `station`, `airport`, `city`, `autonomous_territory`, `subdivision`, `country`.  To use more than one `location_types`, use `&location_types=`
+    + limit (optional, integer, `25`) ... desired number of results in the output
+    + sort (optional, string, `name`) ... desired order of the output.  For A->Z use 'sort=name', for Z->A use 'sort=-name'.  The sorting method called 'rank' expresses the significance of the location, 'sort=rank'.  
++ Response 200 (application/json)
+    + Attributes
+        + locations (array[City, Country, Airport])
+
+### Get by id [GET /locations?type=id&id={id}&locale={locale}]
++ Parameters
+    + id (required, string, `ZW`) ... this is the exact IATA airport or ISO3166 location code - station, airport, city, autonomous_territory, subdivision, country
+    + locale (optional, string, `en-US`) ... desired locale output - this is the the language of the results.  
+        Should any other locale be used other than the specified locales, en-US is used.  
++ Response 200 (application/json)
+    + Attributes
+        + locations (array[City, Subdivision, Country, Airport])
+
+### Get dump [GET /locations?type=dump&locale={locale}&location_types={location_types}&limit={limit}&sort={sort}]
++ Parameters
+    + locale (optional, string, `en-US`) ... desired locale output - this is the the language of the results.  
+        Should any other locale be used other than the specified locales, en-US is used.  
+    + location_types (optional, list, `airport`) ... desired location types of the search.  Accepted values: 
+    `station`, `airport`, `city`, `autonomous_territory`, `subdivision`, `country`.  To use more than one `location_types`, use `&location_types=`
+    + limit (optional, integer, `25`) ... desired number of results in the output
+    + sort (optional, string, `name`) ... desired order of the output.  For A->Z use 'sort=name', for Z->A use 'sort=-name'.  The sorting method called 'rank' expresses the significance of the location, 'sort=rank'.  
++ Response 200 (application/json)
+    + Attributes
+        + locations (array[City, Subdivision, Country, Airport])
+
+## Slugs Collection [/?type=slug]
+
+### Search by seo url [GET /locations?type=slug&term={term}&locale={locale}]
++ Parameters
+    + term (required, string, `albany-new-york-united-states`) ... this field expects the exact slug code of the `airport`, `autonomous_territory`, `city`, `country`, `subdivision`
+    + locale (optional, string, `en-US`) ... desired locale output - this is the the language of the results.  
+        Should any other locale be used other than the specified locales, en-US is used.  
++ Response 200 (application/json)
+    + Attributes
+        + locations (array[Airport, City, Subdivision, Country])
+
+
+# Data Structures
+
+
+## Airport (object)
++ rank: 0
++ type: airport
++ id: LCY
++ name: London City Airport
++ slug: `london-city-airport`
++ alternative_names (array)
++ city (object)
+    + id: london_gb (string)
+    + name: London (string)
+    + slug: london (string)
+    + country (object)
+        + id: GB (string)
+        + slug: `united-kingdom` (string)
+        + name: United Kingdom (string)
++ location (object)
+    + lon: 0.055278
+    + lat: 51.505278
+
+
+## City (object)
++ name: London
++ slug: `london-ontario-canada`
++ rank: 46
++ code: YXU
++ airports: 1
++ type: city
++ population: null
++ id: london_on_ca
++ alternative_names (array)
++ location (object)
+    + lon: `-81.243177`
+    + lat: 42.9869502
++ country (object)
+    + slug: `canada`
+    + name: Canada
+    + id: CA
+
+## Subdivision (object)
++ name: Queensland
++ slug: `queensland-australia`
++ rank: 127
++ id: QL_AU
++ code: QLD
++ type: subdivision
++ alternative_names (array)
++ country (object)
+    + name: Australia
+    + slug: australia
+    + id: AU
+    
+
+## Country (object)
++ name: United Kingdom
++ type: country
++ slug: `united-kingdom`
++ rank: 127
++ id: GB
++ alternative_names (array)
+
+## Slug (object)
++ type: slug,
++ slug: edinburg,
++ id: edinburg_us_1
+
+## Group airlines
+
+This GET call does not have any specific parameters.  It enables the user to get a list of all airlines (both LC - legacy carrier and LCC - low cost carrier) together with their codes.  
+The website to use is https://api.skypicker.com/airlines?
+
+## Group airline-logos
+
+This website provides access to all airlines' logos.  To get the desired airline logo, replace the <iata_code> with an actual airline code in the following link : 
+https://images.kiwi.com/airlines/64/<iata_code>.png
+
+E.g.: https://images.kiwi.com/airlines/64/U2.png
+
+The trademarks, logos, and service marks (hereinafter referred as the "Trademarks") which may be found here are registered and unregistered 
+Trademarks of their respective owners. All Trademarks related to the operating airlines and other third party providers which may be found 
+here belong to their respective owners and we use these Trademarks solely for customers' convenience. Nothing contained on this website 
+should be construed as Our pretension of these third party Trademarks or as granting, by implication, estoppel, or otherwise, any license 
+or right to use any Trademark displayed on the Website without the express written permission of its respective owner, or such third party 
+that may own the Trademarks displayed on the Website. Your misuse of the Trademarks displayed on the Website, or any other content on the 
+Website, is strictly prohibited. You must ensure that Your use of the third party content (Trademarks, logos, watermarks and other 
+registered details) complies with all applicable laws and the intellectual property and other rights of the relevant third party provider. 
+You acknowledge and agree that the third party content and services and all intellectual property rights subsisting in the third party 
+content and services will remain the property of the relevant third party provider. No part of the third party content and services may be 
+modified, duplicated, published, uploaded, distributed, translated, adapted, marketed or used, without the prior written consent of the relevant 
+third party provider.
+
+
+
+## Group flights
+
+A single flights search.
+
+The google flights like filters (price_from,price_to and the next ones) are not well documented and even not tested for properly functioning, yet. 
+
+**Please note, the fields 'dtime' and 'atime' represent local time as UNIX timestamp format.  To display these correctly on your website, please only convert from UNIX to human readable time. Do not convert the time between the time zones.  Doing so, might cause incorrect information being displayed.**  
+
+## flights [/flights{?flyFrom,to,dateFrom,dateTo,longitudeFrom,latitudeFrom,radiusFrom,longitudeTo,latitudeTo,radiusTo,daysInDestinationFrom,daysInDestinationTo,returnFrom,returnTo,maxFlyDuration,typeFlight,passengers,adults,children,infants,flyDays,flyDaysType,returnFlyDays,returnFlyDaysType,oneforcity,onlyWorkingDays,onlyWeekends,one_per_date,directFlights,locale,partner,partner_market,v,xml,curr,locale,price_from,price_to,dtimefrom,dtimeto,atimefrom,atimeto,returndtimefrom,returndtimeto,returnatimefrom,returnatimeto,stopoverfrom,stopoverto,maxstopovers,connectionsOnDifferentAirport,returnFromDifferentAirport,returnToDifferentAirport,ref_tasks,innerLimit,selectedAirlines,selectedStopoverAirports,selectedAirlinesExclude,selectedStopoverAirportsExclude,booking_token,offset,limit,sort,asc}]
+
+### GET [GET]
+
++ Parameters
+
+    + flyFrom (required, string,`CZ`) ... Skypicker api ID of the departure destination. 
+        Accepts multiple values separated by comma, these values might be airport codes, 
+        city IDs, two letter country codes, metropolitan codes and radiuses. 
+        Radius needs to be in form lat-lon-xkm. E.g. `-23.24--47.86-500km` for places 
+        around Sao Paulo. 'LON' - checks every airport in London, 'LHR' - checks flights 
+        from London Heathrow, 'UK' - flights from the United Kingdom.  The number of decimal 
+        places is limited to 6.  
+    + to (optional, string, `porto`) ... Skypicker api ID of the arrival destination. 
+        Accepts the same values in the same format as the `flyFrom` parameter. 
+    If you don't include any value you'll get results for all airports in the world.
+    + dateFrom (required, string,`08/08/2017`) ... search flights from this date (dd/mm/YYYY). **Use parameters dateFrom and dateTo as a date range for the flight departure.**
+        Parameters 'dateFrom=01/05/2016' and 'dateTo=30/05/2016' mean that the **departure** can be anytime between the specified dates.
+        For the dates of the return flights, use the 'returnTo' and 'returnFrom' or 'daysInDestinationFrom' and 'daysInDestinationTo' parameters.  
+    + dateTo (required, string,`08/09/2017`) ... search flights upto this date (dd/mm/YYYY)
+
+    + longitudeFrom : 14.0000 (optional, float) - DEPRECATED - please use radiuses 
+        specified in **flyFrom** parameter (longitude of the pinpoint for geo based search, 
+        for the departure destination)
+    + latitudeFrom : 50.2000 (optional, float) - DEPRECATED (lat of the pinpoint for 
+        geo based search, for the departure destination)
+    + radiusFrom : 200 (optional, integer) - DEPRECATED (search radius in km, max 250.
+        **radiusFrom** works only with **longitudeFrom** and **latitudeFrom**. 
+        In this case, the **flyFrom** parameter is ignored)
+        
+    + longitudeTo : 14.0000 (optional, float) - DEPRECATED - please use radiuses 
+        specified in **to** parameter (longitude of the pinpoint for geo based, for the 
+        arrival destination)
+    + latitudeTo : 50.2000 (optional, float) - DEPRECATED (lat of the pinpoint for 
+        geo based search, for the arrival destination)
+    + radiusTo : 200 (optional, integer) - DEPRECATED (search radius in km, max 250.
+        **radiusTo** works only with **longitudeTo** and **latitudeTo**. In this case, 
+        the **to** parameter is ignored)
+    
+    + daysInDestinationFrom : 2 (optional, integer) - the minimal length of stay in the destination given in the **to** parameter. **Counts nights, not days**
+    + daysInDestinationTo : 14 (optional, integer) - the max length of stay in the destination given in the **to** parameter
+        (use only one from the daysInDestination and returnFrom/returnTo parameters. If both of them are given, the API uses the daysInDest parameters
+        and the return dates are ignored). When you omit one of these two params, the default value for daysInDestinationFrom is 1 and for daysInDestinationTo is 14.
+    
+    + returnFrom : 08/08/2017 (optional, string) - min return date of the whole trip (dd/mm/YYYY)
+    + returnTo : 08/09/2017 (optional, string) - max return date of the whole trip (dd/mm/YYYY)
+    
+    + maxFlyDuration : 6 (optional, integer) - max flight duration in hours, min value 0
+    + typeFlight (optional, string, `oneway`) ... switch for oneway/round flights search - will be deprecated in the near future
+        (until then, you have to use the round parameter if one from the daysInDestination of return date parameters is given.)
+        
+        + Values
+            + `round`
+            + `oneway`
+            
+    
+    + oneforcity : 0 (optional, boolean) - returns the cheapest flights to every city covered by the **to** parameter. E.g. if you set it to 1 and your search is from PRG to LON/BUD/NYC, you'll get 3 results: the cheapest PRG-LON, the cheapest PRG-BUD, and the cheapest PRG-NYC.
+    + one_per_date : 0 (optional, boolean) - returns the cheapest flights for one date. Can be 0 or not included, or one of these two params can be set to 1
+    
+    + passengers : 1 (optional, integer) - number of passengers. Default for defining the num of passengers.
+    
+    + adults : 1 (optional, integer) - To specify number of adults, children and infants, you can use adults&children&infants parameters. You have to specify all of those 3 parameters, otherwise the parameter passengers will be used. However, currently children&infants are considered as adults in our search engine and are not reqiured, default adults value is 1.
+    + children : 0 (optional, integer) - number of children
+    + infants : 0 (optional, integer) - number of infants
+    
+    + flyDays : [0,1,2,3,4,5,6] (optional, list) - the list of week days for the flight, where 0 is Sunday, 1 is Monday, etc.  
+            URL encoded format for all days : 'flyDays%5B%5D=0&flyDays%5B%5D=1&
+            flyDays%5B%5D=2&flyDays%5B%5D=3&flyDays%5B%5D=4&
+            flyDays%5B%5D=5&flyDays%5B%5D=6'
+    
+    
+    
+    + flyDaysType (optional, string, `departure`) ... type of set flyDays; It is used to specify whether the flight is an arrival or a departure.  
+    
+        + Values
+            + `departure`
+            + `arrival`
+
+    + returnFlyDays : [0,1,2,3,4,5,6] (optional, list) - the list of week days for the flight, where 0 is Sunday, 1 is Monday, etc.  
+            URL encoded format for all days: 'returnFlyDays%5B%5D=0&
+            returnFlyDays%5B%5D=1&returnFlyDays%5B%5D=2&
+            returnFlyDays%5B%5D=3&returnFlyDays%5B%5D=4&
+            returnFlyDays%5B%5D=5&returnFlyDays%5B%5D=6)
+    
+    + returnFlyDaysType (optional, string, `departure`) ... type of set returnFlyDays; t is used to specify whether the flight is an arrival or a departure.  
+        
+        + Values
+            + `departure`
+            + `arrival`
+    
+    + onlyWorkingDays : 0 (optional, boolean) - search flights with departure only on working days
+    + onlyWeekends : 0 (optional, boolean) - search flights with departure only on weekends 
+    + directFlights : 0 (optional, boolean) - search only for direct flights, can be set to 0 or 1, 0 is default
+
+    + partner : picky (required, string) - partner ID. If present, the result will include a link to a specific trip directly to skypicker.com, with the affiliate ID included (use picky partner ID for testing)
+    + partner_market : us (required, string) - Market from which the request is coming from.
+    + v : 2 (optional, integer) - api version, defaults to 1, in case of 2 the response format contains additional information (country codes and names, for now used only on skypicker.com frontend)
+    
+    + xml : 0 (optional, integer) - returns an xml response instead of json
+    + curr (optional, string, `EUR`) ... use this parameter to change the currency in the response
+        
+        + Values
+            + `AED`
+            + `AFN`
+            + `ALL`
+            + `AMD`
+            + `ANG`
+            + `AOA`
+            + `ARS`
+            + `AUD`
+            + `AWG`
+            + `AZN`
+            + `BAM`
+            + `BBD`
+            + `BDT`
+            + `BGN`
+            + `BHD`
+            + `BIF`
+            + `BMD`
+            + `BND`
+            + `BOB`
+            + `BRL`
+            + `BSD`
+            + `BTC`
+            + `BTN`
+            + `BWP`
+            + `BYR`
+            + `BZD`
+            + `CAD`
+            + `CDF`
+            + `CHF`
+            + `CLF`
+            + `CLP`
+            + `CNY`
+            + `COP`
+            + `CRC`
+            + `CUC`
+            + `CUP`
+            + `CVE`
+            + `CZK`
+            + `DJF`
+            + `DKK`
+            + `DOP`
+            + `DZD`
+            + `EEK`
+            + `EGP`
+            + `ERN`
+            + `ETB`
+            + `EUR`
+            + `FJD`
+            + `FKP`
+            + `GBP`
+            + `GEL`
+            + `GGP`
+            + `GHS`
+            + `GIP`
+            + `GMD`
+            + `GNF`
+            + `GTQ`
+            + `GYD`
+            + `HKD`
+            + `HNL`
+            + `HRK`
+            + `HTG`
+            + `HUF`
+            + `IDR`
+            + `ILS`
+            + `IMP`
+            + `INR`
+            + `IQD`
+            + `IRR`
+            + `ISK`
+            + `JEP`
+            + `JMD``
+            + `JOD`
+            + `JPY`
+            + `KES`
+            + `KGS`
+            + `KHR`
+            + `KMF`
+            + `KPW`
+            + `KRW`
+            + `KWD`
+            + `KYD`
+            + `KZT`
+            + `LAK`
+            + `LBP`
+            + `LKR`
+            + `LRD`
+            + `LSL`
+            + `LTL`
+            + `LVL`
+            + `LYD`
+            + `MAD`
+            + `MDL`
+            + `MGA`
+            + `MKD`
+            + `MMK`
+            + `MNT`
+            + `MOP`
+            + `MRO`
+            + `MTL`
+            + `MUR`
+            + `MVR`
+            + `MWK`
+            + `MXN`
+            + `MYR`
+            + `MZN`
+            + `NAD`
+            + `NGN`
+            + `NIO`
+            + `NOK`
+            + `NPR`
+            + `NZD`
+            + `OMR`
+            + `PAB`
+            + `PEN`
+            + `PGK`
+            + `PHP`
+            + `PKR`
+            + `PLN`
+            + `PYG`
+            + `QAR`
+            + `QUN`
+            + `RON`
+            + `RSD`
+            + `RUB`
+            + `RWF`
+            + `SAR`
+            + `SBD`
+            + `SCR`
+            + `SDG`
+            + `SEK`
+            + `SGD`
+            + `SHP`
+            + `SLL`
+            + `SOS`
+            + `SRD`
+            + `STD`
+            + `SVC`
+            + `SYP``
+            + `SZL`
+            + `THB`
+            + `TJS`
+            + `TMT`
+            + `TND`
+            + `TOP`
+            + `TRY`
+            + `TTD`
+            + `TWD`
+            + `TZS`
+            + `UAH`
+            + `UGX`
+            + `USD`
+            + `UYU`
+            + `UZS`
+            + `VEF`
+            + `VND`
+            + `VUV`
+            + `WST`
+            + `XAF`
+            + `XAG`
+            + `XAU`
+            + `XCD`
+            + `XDR`
+            + `XOF`
+            + `XPD`
+            + `XPF`
+            + `XPT`
+            + `YER`
+            + `ZAR`
+            + `ZMK`
+            + `ZMW`
+            + `ZWL`
+            
+            
+    
+    + locale (optional, string, `en`) ... the language of city names in the response
+        
+        + Values
+            + `ae`
+            + `ag`
+            + `ar`
+            + `at`
+            + `au`
+            + `be`
+            + `bg`
+            + `bh`
+            + `br`
+            + `by`
+            + `ca`
+            + `ca-fr`
+            + `ch`
+            + `cl`
+            + `cn`
+            + `co`
+            + `ct`
+            + `cz`
+            + `da`
+            + `de`
+            + `dk`
+            + `ec`
+            + `ee`
+            + `el`
+            + `en`
+            + `es`
+            + `fi`
+            + `fr`
+            + `gb`
+            + `gr`
+            + `hk`
+            + `hr`
+            + `hu`
+            + `id`
+            + `ie`
+            + `il`
+            + `in`
+            + `is`
+            + `it`
+            + `ja`
+            + `jo`
+            + `jp`
+            + `ko`
+            + `kr`
+            + `kw`
+            + `kz`
+            + `lt`
+            + `mx`
+            + `my`
+            + `nl`
+            + `no`
+            + `nz`
+            + `om`
+            + `pe`
+            + `ph`
+            + `pl`
+            + `pt`
+            + `qa`
+            + `ro`
+            + `rs`
+            + `ru`
+            + `sa`
+            + `se`
+            + `sg`
+            + `sk`
+            + `sr`
+            + `sv`
+            + `th`
+            + `tr`
+            + `tw`
+            + `ua`
+            + `uk`
+            + `us`
+            + `vn`
+            + `za`
+    
+    + price_from : 1 (optional, integer) - result filter, minimal price
+    + price_to : 10000 (optional, integer) - result filter, maximal price
+
+    + dtimefrom : 00:00 (optional, string) - result filter, min. departure time (11:00 means 11AM, 23:00 means 11PM).  
+    + dtimeto : 00:00 (optional, string)  - result filter, max departure time
+    + atimefrom : 00:00 (optional, string) - result filter, min arrival time
+    + atimeto : 00:00 (optional, string)  - result filter, max arrival time
+    + returndtimefrom : 00:00 (optional, string) - result filter, min dep. time of the returning flight
+    + returndtimeto : 00:00 (optional, string) - result filter, max dep. time of the returning flight
+    + returnatimefrom : 00:00 (optional, string) - result filter, min arrival time of the returning flight
+    + returnatimeto : 00:00 (optional, string) - result filter, min arrival time of the returning flight
+    + stopoverfrom : 00:00 (optional, string) - result filter, min length of stopover, 48:00 means 2 days (48 hours)
+    + stopoverto : 00:00 (optional, string) - result filter, max length of stopover, 48:00 means 2 days (48 hours)
+    + maxstopovers : 2 (optional, integer) - max number of stopovers
+    + connectionsOnDifferentAirport : 1 (optional, integer) - whether or not to search for connections on different airport, can be set to 0 or 1, 1 is default
+    + returnFromDifferentAirport : 1 (optional, integer) - whether or not to search for flights leaving from a different airport than where the customer landed, can be set to 0 or 1, 1 is default
+    + returnToDifferentAirport : 1 (optional, integer) - whether or not to search for flights returning to a different airport than the one from where the customer departed, can be set to 0 or 1, 1 is default
+    + ref_tasks : null (optional, string) - internal use only, tasks for refresh, it is used to force refresh of flights specified in the structure
+    + innerLimit : 300 (optional, integer) - defaults to 300
+
+    + selectedAirlines : null (optional, string) - a list of airlines (IATA codes) separated by ',' (commas) that should / should not be included in the search.  
+    The selection or omission of the airline depends on the 'selectedAirlinesExclude' parameter.  Select a list of airlines and use the 
+    'selectedAirlinesExclude' parameter to specify whether or not the selected airlines should be excluded/included in the search.  
+    
+    + selectedAirlinesExclude : False (optional, boolean) - it can be thought of as a switch for the 'selectedAirlines' parameter where
+    'False=select' and 'True=omit'.  If set to *true* the search returns combinations where all flights in this combination are served by one 
+    of the given airline codes.  If set to *false* the search returns combinations where none of the flights in this combinations is served by any given
+    airline code.  
+    
+    + selectedStopoverAirports : null (optional, string) - a list of stopover airports (IATA codes) separated by ',' (commas) that should / should not be included
+    in the search.  The selection or omission of the airport depends on the 'selectedStopoverAirportsExclude' parameter.  Select a list of airports 
+    and use the 'selectedStopoverAirportsExclude' parameter to specify whether or not the selected airport should be excluded/included in the search.  
+    
+    + selectedStopoverAirportsExclude : False (optional, boolean) -iIt can be thought of as a switch for the 'selectedStopoverAirports' parameter where
+    'False=include,select' and 'True=exclude,omit'.  If set to *true* the search returns combinations where a stopover is through one of the given 
+    airports.  If is set to *false* the search returns combinations where none of stopovers is through any of given airports.  
+
+    + offset : 0 (optional, integer) - enable pagination and set offset
+    + limit : 30 (optional, integer) - limit number of results, max is 200
+    + sort : price (optional, string) - sorts the results by quality, price, date or duration. Price is the default value
+    + asc : 1 (optional, integer) - can be set to 1 or 0, default is 1 - from cheapest flights to the most expensive
+    
+    
++ Response 400 (application/json)
+
+        {"message": "Here you will be notified of the error that occurred."}
+
+
++ Response 200 (application/json)
+
+        {
+          "search_params": {
+            "to_type": "airport",
+            "flyFrom_type": "airport"
+          },
+          "time": 1,
+          "connections": [],
+          "currency": "pln",
+          "currency_rate": 0.2353,
+          
+        
+          "data": [
+            {
+              "mapIdfrom": "edinburgh",
+              "return_duration": "10h 55m",
+              "flyTo": "WMI",
+              "conversion": {
+                "PLN": 1154,
+                "EUR": 271
+              },
+              "deep_link": "https://www.skypicker.com/deep?type=abc-m14.5&from=EDI&to=WMI&departure=19-12-2015&return=23-12-2015&flightsId=240466858|236557749|245258276|234220297&affilid=skyscanner_pl&price=271.5362&passengers=1&lang=pl&currency=pln&booking_token=NwyrOTUtH6wv4BdWZTvOrbnFTa5SOifCjnpGoAl4cKO2kB2HhT7afLhR/TDxb+eFu4YtIczyK0WbM+XCt51oGwDK7vohxDpNs2GE3fTG8FoBhxY59V7abVbbkEWcRIOXaJcmIZB1tq37mciGQWi4Sc29PEWEgFYVwxJYBIOJMNLYkB8FOhhUNMDmnaVNHDOgySMJd4it4r5fhopJczkKnJIKoMFEelHE0x5203/3dHkfA7iBk4/c1OYTA61XBIAlsCuTH4D0j0IHASTFV4VXT36kZS9oxvJuya4nyDoff2017Up/UHkaXQbNBAoD5W0A",
+              "mapIdto": "warsaw",
+              "nightsInDest": 3,
+              "id": "240466858|236557749|245258276|234220297",
+              "fly_duration": "24h 10m",
+              "countryTo": {
+                "code": "PL",
+                "name": "Rzeczpospolita Polska"
+              },
+              "baglimit": {
+                "hand_width": 40,
+                "hand_length": 55,
+                "hold_weight": 15,
+                "hand_height": 20,
+                "hand_weight": 10
+              },
+              "aTimeUTC": 1450643100,
+              "distance": 1624.4,
+              "price": 1154,
+              "type_flights": [
+                "lcc"
+              ],
+              "bags_price": {
+                "1": 100.0,
+                "2": 200.0
+              },
+              "cityTo": "Warszawa",
+              "flyFrom": "EDI",
+              "dTimeUTC": 1450556100,
+              "p2": 232,
+              "countryFrom": {
+                "code": "GB",
+                "name": "Zjednoczone Królestwo Wielkiej Brytanii"
+              },
+              "p1": 232,
+              "dTime": 1450556100,
+              "booking_token": "NwyrOTUtH6wv4BdWZTvOrbnFTa5SOifCjnpGoAl4cKO2kB2HhT7afLhR/TDxb+eFu4YtIczyK0WbM+XCt51oGwDK7vohxDpNs2GE3fTG8FoBhxY59V7abVbbkEWcRIOXaJcmIZB1tq37mciGQWi4Sc29PEWEgFYVwxJYBIOJMNLYkB8FOhhUNMDmnaVNHDOgySMJd4it4r5fhopJczkKnJIKoMFEelHE0x5203/3dHkfA7iBk4/c1OYTA61XBIAlsCuTH4D0j0IHASTFV4VXT36kZS9oxvJuya4nyDoff2017Up/UHkaXQbNBAoD5W0A",
+              "cityFrom": "Edynburg",
+              "aTime": 1450646700,
+              
+              "route": [
+                {
+                  "bags_recheck_required": false,
+                  "aTimeUTC": 1450560300,
+                  "mapIdfrom": "edinburgh",
+                  "mapIdto": "dublin",
+                  "flight_no": 819,
+                  "dTime": 1450556100,
+                  "latTo": 53.3331,
+                  "flyTo": "DUB",
+                  "return": 0,
+                  "source": null,
+                  "id": "240466858",
+                  "airline": "FR",
+                  "lngTo": -6.24889,
+                  "cityTo": "Dublin",
+                  "cityFrom": "Edynburg",
+                  "lngFrom": -3.1936633587,
+                  "aTime": 1450560300,
+                  "flyFrom": "EDI",
+                  "price": 21.0,
+                  "latFrom": 55.9485946759,
+                  "dTimeUTC": 1450556100
+                },
+                {
+                  "bags_recheck_required": true,
+                  "aTimeUTC": 1450643100,
+                  "mapIdfrom": "dublin",
+                  "mapIdto": "warsaw",
+                  "flight_no": 4543,
+                  "dTime": 1450633200,
+                  "latTo": 52.2298,
+                  "flyTo": "WMI",
+                  "return": 0,
+                  "source": null,
+                  "id": "236557749",
+                  "airline": "FR",
+                  "lngTo": 21.0118,
+                  "cityTo": "Warszawa",
+                  "cityFrom": "Dublin",
+                  "lngFrom": -6.24889,
+                  "aTime": 1450646700,
+                  "flyFrom": "DUB",
+                  "price": 133.0,
+                  "latFrom": 53.3331,
+                  "dTimeUTC": 1450633200
+                },
+                {
+                  "bags_recheck_required": true,
+                  "aTimeUTC": 1450914900,
+                  "mapIdfrom": "warsaw",
+                  "mapIdto": "dublin",
+                  "flight_no": 4544,
+                  "dTime": 1450907400,
+                  "latTo": 53.3331,
+                  "flyTo": "DUB",
+                  "return": 1,
+                  "source": null,
+                  "id": "245258276",
+                  "airline": "FR",
+                  "lngTo": -6.24889,
+                  "cityTo": "Dublin",
+                  "cityFrom": "Warszawa",
+                  "lngFrom": 21.0118,
+                  "aTime": 1450914900,
+                  "flyFrom": "WMI",
+                  "price": 63.0,
+                  "latFrom": 52.2298,
+                  "dTimeUTC": 1450903800
+                },
+                {
+                  "bags_recheck_required": true,
+                  "aTimeUTC": 1450943100,
+                  "mapIdfrom": "dublin",
+                  "mapIdto": "edinburgh",
+                  "flight_no": 812,
+                  "dTime": 1450938600,
+                  "latTo": 55.9485946759,
+                  "flyTo": "EDI",
+                  "return": 1,
+                  "source": null,
+                  "id": "234220297",
+                  "airline": "FR",
+                  "lngTo": -3.1936633587,
+                  "cityTo": "Edynburg",
+                  "cityFrom": "Dublin",
+                  "lngFrom": -6.24889,
+                  "aTime": 1450943100,
+                  "flyFrom": "DUB",
+                  "price": 15.0,
+                  "latFrom": 53.3331,
+                  "dTimeUTC": 1450938600
+                }
+              ]
+            }
+         ]
+        }
+
+
+## Group flights_multi
+
+This call is able to do multi-city searches in parallel. The single search queries don't have to be connected in any way.
+
+It accepts the same parameters as the /flights API call.
+
+To do a request, send a POST json payload with a list of API parameters for each search query.
+
+The maximum number of segments in each request is 9 (If a higher number of routes is requested in /flights_multi POST method, all that they receive is an empty result - `[]`)
+
+A sample python code for this call could look like the following (this is an example - all of the /flights parameters can be used)
+
+In the response root, the results field contains a list of responses for the posted queries. Every single element contains the same response as it would if /flights API call were used.
+
+Please keep in mind, that valid json quotes are only " (double quotes), not ' (single quotes).  
+
+Each result has its own deeplink which can be used to forward the user to Skypicker booking e.g. 
+https://www.skypicker.com/deep?type=default&from=PRG&to=LGW&departure=24-05-2017&flightsId=EJ635397264_189412776%7CEJ635397264_203224652&affilid=picky&price=78&passengers=1&lang=en&currency=GBP&booking_token=GamFTRHoBQ%2Fv6QB8IrykhpoVGKB0KA6sVANbFz24Dysa%2Btv8RDKePuXd0gMoWNZtroOXF%2BfO3fCLZ2ifi2bX%2F6pARs2%2BL4SCj%2FMPCz7A8VhRbcA3l2oWqbFdLAgK5KoX1GbT8rDRzbX74ht5Kt6dSHkGKFj%2F60E5Te1YshXVQhgZWzaFAuQ%2BZQ8X%2BMZ9YTwafUFV6K64YKFEF1%2BLPpUlcmqGNY9vzERgsQEfNLUUrCpDbkVRsgcXZMo8I3kt%2BG9B0a6IUViEKm328bxTLQOyAbsv0Eyf469eMuPyNNupwBEBDHWxfYgRz8lsayiRSXSbRMa4i1FpG0buiPdstLs8I3zRZsBvkzx4N525ePFeqMDhDCr6uBkf6xSkMmjiQAUBlsjVW2lvtQJGFr2ihNNuNlZTAL86RR22aGJ0abCzvcY%3D
+
+The total_price is the sum of all the prices.
+
+The main_booking_token in the response root should be used for booking the flights, instead of the booking_token in each single search query result.
+
+## flights_multi [/flights_multi{?partner,locale,curr}]
+
+### POST [POST]
+
++ Parameters
+    + partner : `picky` (required, string) - your partner ID
+    + locale : `en` (optional, string) - localization, if you are using it for flights
+    + curr : `GBP` (optional, string) - currency, if you are using it for flights
+    
+
++ Request (application/json)
+        
+        Adding     {"requests": [
+        {"to": "AMS", "flyFrom": "PRG", "directFlights": 0, "dateFrom": "11/06/2017", "dateTo": "28/06/2017"},
+        {"to": "OSL", "flyFrom": "AMS", "directFlights": 0, "dateFrom": "01/07/2017", "dateTo": "11/07/2017"}
+        ]}
+
+## Group check_flights
+
+Please see our booking documentation http://docs.skypickerbookingapi1.apiary.io/#reference/check-flights
+
+## Group save_booking
+
+Please refer to our documentation on save_booking http://docs.skypickerbookingapi1.apiary.io/#reference/save-booking
+
+## Group confirm_payment
+
+Please see our documentation on confirm_payment http://docs.skypickerbookingapi1.apiary.io/#reference/payment/confirmpayment
+
+## Group webHooks
+
+For more information on webHooks, please see the following document.  It details how relevant information about the state of 
+a reservation is delivered to the customers' endpoint.  It also describes all notifications that are sent from kiwi.com.  
+
+http://docs.webhooksapi11.apiary.io/#
+
+## Group check_itinerary
+
+Request JSON data:
+
++ price - price of the trip
++ currency - currency (optional, default is EUR)
++ segments - contains all flight segments that are needed to book with one itenerary:
+
+    + airline - code of airline
+    + dtime - departure time in local time of single flight
+    + atime - arrival time in local time of single flight
+    + src - departure airport
+    + dst - destination airport
+    + flight_no - flight number
+    + itinerary_id - increment id of itinerary what will be used as a pairing key that needs to be booked together as one pnr.
+    + fare_code - fare code preferred on booking (optional)
+    + booking_class - minimal booking class (IATA class code). Example: T, B, Y (optional)
+    + fare_basis_code - fare code used to calculate prices. Example: QLOWMO, K6OWA (optional)
+
++ passengers - details about passengers - see below
++ bag_allowance - baggage weight (in kg) which should be included in pricing (optional)
++ language - language code. Example: en, de, ru (optional)
++ point_of_sale - country code of preferred point of sale for pricing. Example: US, RU, CZ (optional)
+
+    
+Date sent in response:
+
++ request - there will be all requested details.
++ booking_details - information needed to process the booking
+    + price - verified price of flights for how much we can process that flights booking
+    + valid - if we are unable process this booking, valid will = 'false'. (this can happen when flights are not available anymore)
+    + booking_token - booking token that will be used for call to booking api.
+    + guarantee_applied - list of connections where guarantee will be applied
+
+
+### POST /check_itinerary
+
++ Request (application/json)
+
+        {
+            "passengers": {
+                "infants": 0,
+                "adults": 1,
+                "children": 0
+            },
+            "segments": [
+                {"src":"PRG","itinerary_id":1,"flight_no":1198,"dtime":1467197400,"airline":"QS","atime":1467210600,"dst":"SVO"},
+                {"src":"SVO","itinerary_id":2,"flight_no":1199,"dtime":1467732000,"airline":"QS","atime":1467738600,"dst":"PRG"}
+            ],
+            "price":198,
+            "currency": "EUR"
+        }
+
++ Response 200 (application/json)
+
+        {
+            "request": {
+                "segments":[
+                    {"airline":"DE","dtime":29839230923,"atime":"932809283023","src":"PRG","dst":"STN","flight_no":1392,"itinerary_id":1, "fare_code": "Y"},
+                    {"airline":"SU","dtime":29839230923,"atime":"932809283023","src":"STN","dst":"VRO","flight_no":2983,"itinerary_id":2}
+                ],
+                "price": 299,
+                "passengers": {
+                    "infants": 0,
+                    "adults": 1,
+                    "children": 0
+                }
+            },
+            "booking_details": {
+                "price": 310,
+                "valid": true,
+                "booking_token": "2938394U98FDJKSBJFKH IUZ4B98NZ3IOVHSJFGJHKFGD O87B3Z498UHJFSHHGGBW87VZWPUIHDAOBZ3B4bZ89RUHADS",
+                "guarantee_applied": [
+                    1
+                ]
+            }
+        }
